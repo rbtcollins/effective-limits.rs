@@ -1,0 +1,20 @@
+[package]
+name = "effective-limits"
+version = "0.1.0"
+authors = ["Robert Collins <robertc@robertcollins.net>"]
+edition = "2018"
+description = "Estimate effective resource limits for a process e.g. how much RAM is available for use."
+repository = "https://github.com/rbtcollins/effective-limits.rs"
+readme = "READNE.md"
+keywords = ["mem", "limits", "effective", "resource"]
+license = "Apache-2.0"
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sys-info = "0.5.9"
+error-chain = "0.12.2"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.66"
