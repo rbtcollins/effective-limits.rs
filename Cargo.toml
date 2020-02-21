@@ -13,8 +13,35 @@ license = "Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sys-info = "0.5.9"
+sys-info = "=0.5.8"
 error-chain = "0.12.2"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.66"
+
+
+[target."cfg(windows)".dependencies]
+winapi = {version = "0.3",    features = [
+    "combaseapi",
+    "errhandlingapi",
+    "fileapi",
+    "handleapi",
+    "impl-default",
+    "ioapiset",
+    "jobapi",
+    "jobapi2",
+    "minwindef",
+    "processthreadsapi",
+    "psapi",
+    "shlobj",
+    "shtypes",
+    "synchapi",
+    "sysinfoapi",
+    "tlhelp32",
+    "userenv",
+    "winbase",
+    "winerror",
+    "winioctl",
+    "winnt",
+    "winuser",
+    ]}
