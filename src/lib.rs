@@ -55,9 +55,9 @@ fn ulimited_memory() -> Result<Option<u64>> {
         libc::RLIM_INFINITY => address_limit,
         _ => Some(out.rlim_cur),
     };
-    address_limit
+    Ok(address_limit
         .or(data_limit)
-        .map(|left| min_opt(left, data_limit))
+        .map(|left| min_opt(left, data_limit)))
 }
 
 #[cfg(not(unix))]
@@ -121,15 +121,13 @@ pub fn memory_limit() -> Result<u64> {
 
 #[cfg(test)]
 mod tests {
-    use std::default::Default;
     use std::env;
-    use std::mem::size_of;
     #[cfg(unix)]
     use std::os::unix::process::CommandExt;
     #[cfg(windows)]
     use std::os::windows::process::CommandExt;
     use std::path::PathBuf;
-    use std::process::{Command, Stdio};
+    use std::process::Command;
     use std::str;
 
     #[cfg(windows)]
@@ -169,6 +167,10 @@ mod tests {
             Some(ulimit) => {
                 #[cfg(windows)]
                 {
+                    use std::default::Default;
+                    use std::mem::size_of;
+                    use std::process::Stdio;
+
                     cmd.creation_flags(winapi::um::winbase::CREATE_SUSPENDED);
                     let job = match unsafe {
                         winapi::um::winbase::CreateJobObjectA(
@@ -293,10 +295,18 @@ mod tests {
                 }
                 #[cfg(unix)]
                 {
+                    use std::io::Error;
                     unsafe {
-                        cmd.pre_exec(|| {
-                            libc::setrlimit(libc::RLIMIT_AS, ulimit, libc::RLIM_INFINITY)
-                        })
+                        cmd.pre_exec(move || {
+                            let lim = libc::rlimit {
+                                rlim_cur: ulimit,
+                                rlim_max: libc::RLIM_INFINITY,
+                            };
+                            match libc::setrlimit(libc::RLIMIT_AS, &lim as *const libc::rlimit) {
+                                0 => Ok(()),
+                                _ => Err(Error::last_os_error()),
+                            }
+                        });
                     }
                     cmd.output().chain_err(|| "error running helper")?
                 }
