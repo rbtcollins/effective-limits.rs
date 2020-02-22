@@ -11,6 +11,7 @@ mod errors {
     // Create the Error, ErrorKind, ResultExt, and Result types
     error_chain! {
         foreign_links {
+            IoError(std::io::Error);
             SysInfo(::sys_info::Error);
         }
     }
@@ -33,9 +34,7 @@ fn ulimited_memory() -> Result<Option<u64>> {
     };
     match unsafe { libc::getrlimit(libc::RLIMIT_AS, &mut out as *mut libc::rlimit) } {
         0 => Ok(()),
-        _ => Err(format!("libc call failed {}", unsafe {
-            *libc::__errno_location()
-        })),
+        _ => Err(std::io::Error::last_os_error()),
     }?;
     let address_limit = match out.rlim_cur {
         libc::RLIM_INFINITY => None,
@@ -47,9 +46,7 @@ fn ulimited_memory() -> Result<Option<u64>> {
     };
     match unsafe { libc::getrlimit(libc::RLIMIT_DATA, &mut out as *mut libc::rlimit) } {
         0 => Ok(()),
-        _ => Err(format!("libc call failed {}", unsafe {
-            *libc::__errno_location()
-        })),
+        _ => Err(std::io::Error::last_os_error()),
     }?;
     let data_limit = match out.rlim_cur {
         libc::RLIM_INFINITY => address_limit,
