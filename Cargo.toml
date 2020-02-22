@@ -6,6 +6,7 @@ edition = "2018"
 description = "Estimate effective resource limits for a process e.g. how much RAM is available for use."
 repository = "https://github.com/rbtcollins/effective-limits.rs"
 readme = "README.md"
+categories = ["config", "memory-management"]
 keywords = ["mem", "limits", "effective", "resource"]
 license = "Apache-2.0"
 
