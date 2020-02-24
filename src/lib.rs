@@ -28,17 +28,29 @@ fn min_opt(left: u64, right: Option<u64>) -> u64 {
 
 #[cfg(unix)]
 fn ulimited_memory() -> Result<Option<u64>> {
+    #[cfg(all(not(target_os = "android"), not(target_env = "gnu")))]
+    fn rlimit_as() -> libc::c_int {
+        libc::RLIMIT_AS
+    }
+    #[cfg(all(not(target_os = "android"), target_env = "gnu"))]
+    fn rlimit_as() -> libc::c_uint {
+        libc::RLIMIT_AS
+    }
+    #[cfg(target_os = "android")]
+    fn rlimit_as() -> libc::c_int {
+        9 as libc::c_int
+    }
     let mut out = libc::rlimit {
         rlim_cur: 0,
         rlim_max: 0,
     };
-    match unsafe { libc::getrlimit(libc::RLIMIT_AS, &mut out as *mut libc::rlimit) } {
+    match unsafe { libc::getrlimit(rlimit_as(), &mut out as *mut libc::rlimit) } {
         0 => Ok(()),
         _ => Err(std::io::Error::last_os_error()),
     }?;
     let address_limit = match out.rlim_cur {
         libc::RLIM_INFINITY => None,
-        _ => Some(out.rlim_cur),
+        _ => Some(out.rlim_cur as u64),
     };
     let mut out = libc::rlimit {
         rlim_cur: 0,
@@ -50,7 +62,7 @@ fn ulimited_memory() -> Result<Option<u64>> {
     }?;
     let data_limit = match out.rlim_cur {
         libc::RLIM_INFINITY => address_limit,
-        _ => Some(out.rlim_cur),
+        _ => Some(out.rlim_cur as u64),
     };
     Ok(address_limit
         .or(data_limit)
