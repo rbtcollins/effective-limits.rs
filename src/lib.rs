@@ -38,7 +38,7 @@ fn ulimited_memory() -> Result<Option<u64>> {
     }?;
     let address_limit = match out.rlim_cur {
         libc::RLIM_INFINITY => None,
-        _ => Some(out.rlim_cur),
+        _ => Some(out.rlim_cur as u64),
     };
     let mut out = libc::rlimit {
         rlim_cur: 0,
@@ -50,7 +50,7 @@ fn ulimited_memory() -> Result<Option<u64>> {
     }?;
     let data_limit = match out.rlim_cur {
         libc::RLIM_INFINITY => address_limit,
-        _ => Some(out.rlim_cur),
+        _ => Some(out.rlim_cur as u64),
     };
     Ok(address_limit
         .or(data_limit)
