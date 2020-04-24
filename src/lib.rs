@@ -2,22 +2,23 @@
 // for error_chain!
 #![recursion_limit = "1024"]
 
-#[macro_use]
-extern crate error_chain;
-
 use std::cmp::min;
 
-mod errors {
-    // Create the Error, ErrorKind, ResultExt, and Result types
-    error_chain! {
-        foreign_links {
-            IoError(std::io::Error);
-            SysInfo(::sys_info::Error);
-        }
-    }
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("sysinfo failure")]
+    SysInfo(#[from] ::sys_info::Error),
+    #[error("io error")]
+    IoError(#[from] std::io::Error),
+    #[error("io error {1}")]
+    IoExplainedError(#[source] std::io::Error, String),
+    #[error("utf8 error")]
+    Utf8Error(#[from] std::str::Utf8Error),
+    #[error("u64 parse error on '{1}'")]
+    U64Error(#[source] std::num::ParseIntError, String),
 }
 
-pub use errors::*;
+pub type Result<R> = std::result::Result<R, Error>;
 
 fn min_opt(left: u64, right: Option<u64>) -> u64 {
     match right {
@@ -71,10 +72,10 @@ fn ulimited_memory() -> Result<Option<u64>> {
 
 #[cfg(not(unix))]
 fn win_err<T>(fn_name: &str) -> Result<T> {
-    Err(format!("{} Error {}", fn_name, unsafe {
-        winapi::um::errhandlingapi::GetLastError()
-    })
-    .into())
+    Err(Error::IoExplainedError(
+        std::io::Error::last_os_error(),
+        fn_name.into(),
+    ))
 }
 
 #[cfg(not(unix))]
@@ -176,7 +177,6 @@ mod tests {
             Some(ulimit) => {
                 #[cfg(windows)]
                 {
-                    use std::default::Default;
                     use std::mem::size_of;
                     use std::process::Stdio;
 
@@ -218,7 +218,9 @@ mod tests {
                         .stdout(Stdio::piped())
                         .stderr(Stdio::piped())
                         .spawn()
-                        .chain_err(|| "error spawning helper")?;
+                        .map_err(|e| {
+                            crate::Error::IoExplainedError(e, "error spawning helper".into())
+                        })?;
                     let childhandle = match unsafe {
                         winapi::um::processthreadsapi::OpenProcess(
                             winapi::um::winnt::JOB_OBJECT_ASSIGN_PROCESS
@@ -273,7 +275,7 @@ mod tests {
                                 let err = unsafe { winapi::um::errhandlingapi::GetLastError() };
                                 match err {
                                     winapi::shared::winerror::ERROR_NO_MORE_FILES => Ok(false),
-                                    _ => Err(format!("Thread32Next Error {}", err)),
+                                    _ => win_err("Thread32Next"),
                                 }
                             }
                             _ => Ok(true),
@@ -298,9 +300,9 @@ mod tests {
                         std::u32::MAX => win_err("ResumeThread"),
                         _ => Ok(()),
                     }?;
-                    child
-                        .wait_with_output()
-                        .chain_err(|| "error waiting for child")?
+                    child.wait_with_output().map_err(|e| {
+                        crate::Error::IoExplainedError(e, "error waiting for child".into())
+                    })?
                 }
                 #[cfg(unix)]
                 {
@@ -317,24 +319,22 @@ mod tests {
                             }
                         });
                     }
-                    cmd.output().chain_err(|| "error running helper")?
+                    cmd.output().map_err(|e| {
+                        crate::Error::IoExplainedError(e, "error running helper".into())
+                    })?
                 }
             }
-            None => cmd.output().chain_err(|| "error running helper")?,
+            None => cmd
+                .output()
+                .map_err(|e| crate::Error::IoExplainedError(e, "error running helper".into()))?,
         };
         assert_eq!(true, output.status.success());
         eprintln!("stderr {}", str::from_utf8(&output.stderr).unwrap());
         let limit_bytes = output.stdout;
-        let limit: u64 = str::from_utf8(&limit_bytes)
-            .chain_err(|| "bad utf8")?
+        let limit: u64 = str::from_utf8(&limit_bytes)?
             .trim()
             .parse()
-            .chain_err(|| {
-                format!(
-                    "bad int parse on '{}'",
-                    str::from_utf8(&limit_bytes).unwrap()
-                )
-            })?;
+            .map_err(|e| Error::U64Error(e, str::from_utf8(&limit_bytes).unwrap().into()))?;
 
         Ok(limit)
     }
@@ -344,7 +344,7 @@ mod tests {
         // This test depends on the dev environment being run uncontained.
         let info = sys_info::mem_info()?;
         let total_ram = info.total * 1024;
-        let limit = read_test_process(None).chain_err(|| "Failed to read limit")?;
+        let limit = read_test_process(None)?;
         assert_eq!(total_ram, limit);
         Ok(())
     }
@@ -352,7 +352,7 @@ mod tests {
     #[test]
     fn test_ulimit() -> Result<()> {
         // Page size rounding
-        let limit = read_test_process(Some(99_999_744)).chain_err(|| "Failed to read limit")?;
+        let limit = read_test_process(Some(99_999_744))?;
         assert_eq!(99_999_744, limit);
         Ok(())
     }
