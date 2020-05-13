@@ -18,7 +18,7 @@ sys-info = "=0.5.8"
 thiserror = "1.0.15"
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2.66"
+libc = "0.2.70"
 
 
 [target."cfg(windows)".dependencies]
