@@ -10,11 +10,11 @@ pub enum Error {
     SysInfo(#[from] ::sys_info::Error),
     #[error("io error")]
     IoError(#[from] std::io::Error),
-    #[error("io error {1}")]
+    #[error("io error {1} ({0:?})")]
     IoExplainedError(#[source] std::io::Error, String),
     #[error("utf8 error")]
     Utf8Error(#[from] std::str::Utf8Error),
-    #[error("u64 parse error on '{1}'")]
+    #[error("u64 parse error on '{1}' ({0:?})")]
     U64Error(#[source] std::num::ParseIntError, String),
 }
 
@@ -105,7 +105,7 @@ fn ulimited_memory() -> Result<Option<u64>> {
             &mut written,
         )
     } {
-        FALSE => win_err("SetInformationJobObject"),
+        FALSE => win_err("QueryInformationJobObject"),
         _ => Ok(()),
     }?;
     if job_info.BasicLimitInformation.LimitFlags & JOB_OBJECT_LIMIT_PROCESS_MEMORY
