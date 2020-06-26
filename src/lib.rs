@@ -72,18 +72,26 @@ fn ulimited_memory() -> Result<Option<u64>> {
 
     use winapi::shared::minwindef::{FALSE, LPVOID};
     use winapi::shared::ntdef::NULL;
+    use winapi::um::jobapi::IsProcessInJob;
     use winapi::um::jobapi2::QueryInformationJobObject;
+    use winapi::um::processthreadsapi::GetCurrentProcess;
     use winapi::um::winnt::{
         JobObjectExtendedLimitInformation, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
         JOB_OBJECT_LIMIT_PROCESS_MEMORY,
     };
 
+    let mut in_job = 0;
+    match unsafe { IsProcessInJob(GetCurrentProcess(), NULL, &mut in_job) } {
+        FALSE => win_err("IsProcessInJob"),
+        _ => Ok(()),
+    }?;
+    if in_job == FALSE {
+        return Ok(None);
+    }
     let mut job_info = winapi::um::winnt::JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
         ..Default::default()
     };
     let mut written: u32 = 0;
-    // It is possible, even likely that this doesn't handle being run without a
-    // job today, but hard to tell :/.
     match unsafe {
         QueryInformationJobObject(
             NULL,
