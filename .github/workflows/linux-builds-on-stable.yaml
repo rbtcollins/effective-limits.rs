@@ -25,8 +25,8 @@ jobs:
           - i686-unknown-linux-gnu        # skip-pr skip-master
           - arm-unknown-linux-gnueabi     # skip-pr skip-master
           - arm-unknown-linux-gnueabihf   # skip-pr skip-master
-          - x86_64-unknown-freebsd        # skip-pr skip-master
-          - x86_64-unknown-netbsd         # skip-pr skip-master
+          - x86_64-unknown-freebsd        # skip-master
+          - x86_64-unknown-netbsd         # skip-master
           - powerpc-unknown-linux-gnu     # skip-pr skip-master
           - powerpc64le-unknown-linux-gnu # skip-pr skip-master
           - mips-unknown-linux-gnu        # skip-pr skip-master

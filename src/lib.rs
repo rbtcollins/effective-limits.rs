@@ -4,22 +4,43 @@
 
 use std::cmp::min;
 
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("sysinfo failure")]
-    SysInfo(#[from] ::sys_info::Error),
-    #[error("io error")]
-    IoError(#[from] std::io::Error),
-    #[error("io error {1} ({0:?})")]
-    IoExplainedError(#[source] std::io::Error, String),
-    #[error("utf8 error")]
-    Utf8Error(#[from] std::str::Utf8Error),
-    #[error("u64 parse error on '{1}' ({0:?})")]
-    U64Error(#[source] std::num::ParseIntError, String),
+use cfg_if::cfg_if;
+
+cfg_if! {
+    if #[cfg(any(windows, target_os="macos", target_os="linux"))] {
+        #[derive(thiserror::Error, Debug)]
+        pub enum Error {
+            #[error("sysinfo failure")]
+            SysInfo(#[from] ::sys_info::Error),
+            #[error("io error")]
+            IoError(#[from] std::io::Error),
+            #[error("io error {1} ({0:?})")]
+            IoExplainedError(#[source] std::io::Error, String),
+            #[error("utf8 error")]
+            Utf8Error(#[from] std::str::Utf8Error),
+            #[error("u64 parse error on '{1}' ({0:?})")]
+            U64Error(#[source] std::num::ParseIntError, String),
+        }
+    } else {
+        #[derive(thiserror::Error, Debug)]
+        pub enum Error {
+            #[error("sysinfo not supported on this platform")]
+            SysInfo,
+            #[error("io error")]
+            IoError(#[from] std::io::Error),
+            #[error("io error {1} ({0:?})")]
+            IoExplainedError(#[source] std::io::Error, String),
+            #[error("utf8 error")]
+            Utf8Error(#[from] std::str::Utf8Error),
+            #[error("u64 parse error on '{1}' ({0:?})")]
+            U64Error(#[source] std::num::ParseIntError, String),
+        }
+    }
 }
 
 pub type Result<R> = std::result::Result<R, Error>;
 
+#[allow(dead_code)]
 fn min_opt(left: u64, right: Option<u64>) -> u64 {
     match right {
         None => left,
@@ -27,13 +48,24 @@ fn min_opt(left: u64, right: Option<u64>) -> u64 {
     }
 }
 
+#[allow(dead_code)]
 #[cfg(unix)]
 fn ulimited_memory() -> Result<Option<u64>> {
     let mut out = libc::rlimit {
         rlim_cur: 0,
         rlim_max: 0,
     };
-    match unsafe { libc::getrlimit(libc::RLIMIT_AS, &mut out as *mut libc::rlimit) } {
+    // https://github.com/rust-lang/libc/pull/1919
+    cfg_if!(
+    if #[cfg( target_os="netbsd")] {
+    // https://github.com/NetBSD/src/blob/f869ef2144970023b53d335d9a23ecf100d4b973/sys/sys/resource.h#L98
+    let rlimit_as = 10;
+        }
+    else {
+    let rlimit_as = libc::RLIMIT_AS;
+    }
+    );
+    match unsafe { libc::getrlimit(rlimit_as, &mut out as *mut libc::rlimit) } {
         0 => Ok(()),
         _ => Err(std::io::Error::last_os_error()),
     }?;
@@ -119,10 +151,17 @@ fn ulimited_memory() -> Result<Option<u64>> {
 /// avoiding failed allocations without requiring either developer or user
 /// a-priori selection of memory limits.
 pub fn memory_limit() -> Result<u64> {
-    let info = sys_info::mem_info()?;
-    let total_ram = info.total * 1024;
-    let ulimit_mem = ulimited_memory()?;
-    Ok(min_opt(total_ram, ulimit_mem))
+    cfg_if! {
+        if #[cfg(any(windows, target_os="macos", target_os="linux"))] {
+            let info = sys_info::mem_info()?;
+            let total_ram = info.total * 1024;
+            let ulimit_mem = ulimited_memory()?;
+            Ok(min_opt(total_ram, ulimit_mem))
+        } else {
+            // https://github.com/FillZpp/sys-info-rs/issues/72
+            Err(Error::SysInfo)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -143,6 +182,7 @@ mod tests {
 
     use super::*;
 
+    #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
     #[test]
     fn it_works() -> Result<()> {
         assert_ne!(0, memory_limit()?);
@@ -303,13 +343,22 @@ mod tests {
                 #[cfg(unix)]
                 {
                     use std::io::Error;
+                    // https://github.com/rust-lang/libc/pull/1919
+                    cfg_if!(
+                    if #[cfg( target_os="netbsd")] {
+                    let rlimit_as = 10;
+                        }
+                    else {
+                    let rlimit_as = libc::RLIMIT_AS;
+                    }
+                    );
                     unsafe {
                         cmd.pre_exec(move || {
                             let lim = libc::rlimit {
                                 rlim_cur: ulimit,
                                 rlim_max: libc::RLIM_INFINITY,
                             };
-                            match libc::setrlimit(libc::RLIMIT_AS, &lim as *const libc::rlimit) {
+                            match libc::setrlimit(rlimit_as, &lim as *const libc::rlimit) {
                                 0 => Ok(()),
                                 _ => Err(Error::last_os_error()),
                             }
@@ -335,6 +384,7 @@ mod tests {
         Ok(limit)
     }
 
+    #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
     #[test]
     fn test_no_ulimit() -> Result<()> {
         // This test depends on the dev environment being run uncontained.
