@@ -55,7 +55,17 @@ fn ulimited_memory() -> Result<Option<u64>> {
         rlim_cur: 0,
         rlim_max: 0,
     };
-    match unsafe { libc::getrlimit(libc::RLIMIT_AS, &mut out as *mut libc::rlimit) } {
+    // https://github.com/rust-lang/libc/pull/1919
+    cfg_if!(
+    if #[cfg( target_os="netbsd")] {
+    // https://github.com/NetBSD/src/blob/f869ef2144970023b53d335d9a23ecf100d4b973/sys/sys/resource.h#L98
+    let rlimit_as = 10;
+        }
+    else {
+    let rlimit_as = libc::RLIMIT_AS;
+    }
+    );
+    match unsafe { libc::getrlimit(rlimit_as, &mut out as *mut libc::rlimit) } {
         0 => Ok(()),
         _ => Err(std::io::Error::last_os_error()),
     }?;
@@ -333,13 +343,22 @@ mod tests {
                 #[cfg(unix)]
                 {
                     use std::io::Error;
+                    // https://github.com/rust-lang/libc/pull/1919
+                    cfg_if!(
+                    if #[cfg( target_os="netbsd")] {
+                    let rlimit_as = 10;
+                        }
+                    else {
+                    let rlimit_as = libc::RLIMIT_AS;
+                    }
+                    );
                     unsafe {
                         cmd.pre_exec(move || {
                             let lim = libc::rlimit {
                                 rlim_cur: ulimit,
                                 rlim_max: libc::RLIM_INFINITY,
                             };
-                            match libc::setrlimit(libc::RLIMIT_AS, &lim as *const libc::rlimit) {
+                            match libc::setrlimit(rlimit_as, &lim as *const libc::rlimit) {
                                 0 => Ok(()),
                                 _ => Err(Error::last_os_error()),
                             }
