@@ -17,8 +17,8 @@ license = "Apache-2.0"
 cfg-if="0.1.10"
 thiserror = "1.0.20"
 
-[target.'cfg(any(windows, target_os="macos", target_os="linux"))'.dependencies]
-sys-info = "0.6.1"
+[target.'cfg(any(windows, target_os="macos", target_os="linux", target_os="freebsd"))'.dependencies]
+sys-info = "0.7.0"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.78"

@@ -7,7 +7,11 @@ use std::cmp::min;
 use cfg_if::cfg_if;
 
 cfg_if! {
-    if #[cfg(any(windows, target_os="macos", target_os="linux"))] {
+    if #[cfg(any(windows,
+                 target_os="macos",
+                 target_os="linux",
+                 target_os="freebsd",
+                ))] {
         #[derive(thiserror::Error, Debug)]
         pub enum Error {
             #[error("sysinfo failure")]
@@ -152,7 +156,11 @@ fn ulimited_memory() -> Result<Option<u64>> {
 /// a-priori selection of memory limits.
 pub fn memory_limit() -> Result<u64> {
     cfg_if! {
-        if #[cfg(any(windows, target_os="macos", target_os="linux"))] {
+        if #[cfg(any(windows,
+                     target_os="macos",
+                     target_os="linux",
+                     target_os="freebsd",
+                    ))] {
             let info = sys_info::mem_info()?;
             let total_ram = info.total * 1024;
             let ulimit_mem = ulimited_memory()?;
@@ -182,7 +190,12 @@ mod tests {
 
     use super::*;
 
-    #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
+    #[cfg(any(
+        windows,
+        target_os = "macos",
+        target_os = "linux",
+        target_os = "freebsd",
+    ))]
     #[test]
     fn it_works() -> Result<()> {
         assert_ne!(0, memory_limit()?);
@@ -384,7 +397,12 @@ mod tests {
         Ok(limit)
     }
 
-    #[cfg(any(windows, target_os = "macos", target_os = "linux"))]
+    #[cfg(any(
+        windows,
+        target_os = "macos",
+        target_os = "linux",
+        target_os = "freebsd",
+    ))]
     #[test]
     fn test_no_ulimit() -> Result<()> {
         // This test depends on the dev environment being run uncontained.
