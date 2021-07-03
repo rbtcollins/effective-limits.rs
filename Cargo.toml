@@ -1,6 +1,6 @@
 [package]
 name = "effective-limits"
-version = "0.5.3"
+version = "0.5.4-alpha.0"
 authors = ["Robert Collins <robertc@robertcollins.net>"]
 edition = "2018"
 description = "Estimate effective resource limits for a process e.g. how much RAM is available for use."
