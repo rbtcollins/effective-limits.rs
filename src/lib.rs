@@ -30,7 +30,7 @@ cfg_if! {
     } else {
         #[derive(thiserror::Error, Debug)]
         pub enum Error {
-            #[error("sysinfo not supported on this platform")]
+            #[error("no system information on this platform")]
             SysInfo,
             #[error("io error")]
             IoError(#[from] std::io::Error),
