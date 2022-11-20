@@ -13,6 +13,7 @@ cfg_if! {
                  target_os="freebsd",
                  target_os="illumos",
                  target_os="solaris",
+                 target_os="netbsd",
                 ))] {
         #[derive(thiserror::Error, Debug)]
         pub enum Error {
@@ -164,6 +165,7 @@ pub fn memory_limit() -> Result<u64> {
                      target_os="freebsd",
                      target_os="illumos",
                      target_os="solaris",
+                     target_os="netbsd",
                     ))] {
             let info = sys_info::mem_info()?;
             let total_ram = info.total * 1024;
@@ -201,6 +203,7 @@ mod tests {
         target_os = "freebsd",
         target_os = "illumos",
         target_os = "solaris",
+        target_os = "netbsd",
     ))]
     #[test]
     fn it_works() -> Result<()> {
