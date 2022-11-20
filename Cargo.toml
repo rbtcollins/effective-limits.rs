@@ -1,20 +1,20 @@
 [package]
-name = "effective-limits"
-version = "0.5.4"
 authors = ["Robert Collins <robertc@robertcollins.net>"]
-edition = "2018"
-description = "Estimate effective resource limits for a process e.g. how much RAM is available for use."
-repository = "https://github.com/rbtcollins/effective-limits.rs"
-readme = "README.md"
 categories = ["config", "memory-management"]
+description = "Estimate effective resource limits for a process e.g. how much RAM is available for use."
+edition = "2018"
 keywords = ["mem", "limits", "effective", "resource"]
 license = "Apache-2.0"
+name = "effective-limits"
+readme = "README.md"
+repository = "https://github.com/rbtcollins/effective-limits.rs"
+version = "0.5.5"
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cfg-if="0.1.10"
+cfg-if = "0.1.10"
 thiserror = "1.0.20"
 
 [target.'cfg(any(windows, target_os="macos", target_os="linux", target_os="freebsd", target_os="illumos", target_os="solaris", target_os="netbsd"))'.dependencies]
@@ -25,7 +25,7 @@ libc = "0.2.78"
 
 
 [target."cfg(windows)".dependencies]
-winapi = {version = "0.3.9",    features = [
+winapi = { version = "0.3.9", features = [
     "combaseapi",
     "errhandlingapi",
     "fileapi",
@@ -48,4 +48,4 @@ winapi = {version = "0.3.9",    features = [
     "winioctl",
     "winnt",
     "winuser",
-    ]}
+] }
