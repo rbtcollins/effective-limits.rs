@@ -24,8 +24,12 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             run_tests: YES
+            #snap_arch: amd64
+          - target: armv7-unknown-linux-gnueabihf
+            #snap_arch: armhf
     steps:
-      - uses: actions/checkout@v2
+      - name: Clone repo
+        uses: actions/checkout@v2
         with:
           # v2 defaults to a shallow checkout, but we need at least to the previous tag
           fetch-depth: 0
@@ -35,7 +39,7 @@ jobs:
       - name: Display the current git status
         run: |
           git status
-          git describe --tags
+          git describe
       - name: Prep cargo dirs
         run: |
           mkdir -p ~/.cargo/{registry,git}
@@ -47,21 +51,24 @@ jobs:
         run: |
           echo "SKIP_TESTS=yes" >> $GITHUB_ENV
         if: matrix.run_tests == ''
-      - name: Cache cargo registry
-        uses: actions/cache@v1
+      - name: Cache cargo registry and git trees
+        uses: actions/cache@v2
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-trimmed
-      - name: Cache cargo git trees
-        uses: actions/cache@v1
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-gits-trimmed
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Get rustc commit hash
+        id: cargo-target-cache
+        run: |
+          echo "::set-output name=rust_hash::$(rustc -Vv | grep commit-hash | awk '{print $2}')"
+        shell: bash
       - name: Cache cargo build
-        uses: actions/cache@v1
+        uses: actions/cache@v2
         with:
           path: target
-          key: ${{ runner.os }}-cargo-build-trimmed-${{ matrix.target }}
+          key: ${{ github.base_ref }}-${{ github.head_ref }}-${{ matrix.target }}-cargo-target-dir-${{ steps.cargo-target-cache.outputs.rust_hash }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ github.base_ref }}-${{ matrix.target }}-cargo-target-dir-${{ steps.cargo-target-cache.outputs.rust_hash }}-${{ hashFiles('**/Cargo.lock') }}
       - name: Install Rustup
         run: |
           curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=none --profile=minimal -y
@@ -90,15 +97,14 @@ jobs:
           fi
       - name: Run the build within the docker image
         run: |
-          HERE=$(pwd)
-          mkdir -p "${HERE}/target"
-          chown -R "$(id -u)":"$(id -g)" "${HERE}/target"
+          mkdir -p "${PWD}/target"
+          chown -R "$(id -u)":"$(id -g)" "${PWD}/target"
           docker run \
             --entrypoint sh \
             --user "$(id -u)":"$(id -g)" \
             --volume "$(rustc --print sysroot)":/rustc-sysroot:ro \
-            --volume "${HERE}":/checkout:rw \
-            --volume "${HERE}"/target:/checkout/target \
+            --volume "${PWD}":/checkout:ro \
+            --volume "${PWD}"/target:/checkout/target \
             --workdir /checkout \
             --env TARGET="${TARGET}" \
             --env SKIP_TESTS="${SKIP_TESTS}" \
@@ -111,6 +117,31 @@ jobs:
             --rm \
             "${DOCKER}" \
             -c 'PATH="${PATH}":/rustc-sysroot/bin bash ci/run.bash'
+      - name: Upload the built artifact
+        if: false
+        uses: actions/upload-artifact@v2
+        with:
+          name: rustup-init-${{ matrix.target }}
+          path: |
+            target/${{ matrix.target }}/release/rustup-init
+          retention-days: 7
+      - name: Acquire the AWS tooling
+        run: |
+          pip3 install -U setuptools
+          pip3 install awscli
+        if: false && github.event_name == 'push' && github.ref == 'refs/heads/stable'
+      - name: Prepare the dist
+        run: |
+          bash ci/prepare-deploy.bash
+        if: false && github.event_name == 'push' && github.ref == 'refs/heads/stable'
+      - name: Deploy build to dev-static dist tree for release team
+        run: |
+          aws s3 cp --recursive deploy/ s3://dev-static-rust-lang-org/rustup/
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-west-1
+        if: false && github.event_name == 'push' && github.ref == 'refs/heads/stable'
       - name: Clear the cargo caches
         run: |
           cargo install cargo-cache --no-default-features --features ci-autoclean
