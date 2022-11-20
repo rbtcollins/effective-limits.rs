@@ -10,12 +10,13 @@ set -e
 TARGET="$1"
 
 RUST_REPO="https://github.com/rust-lang/rust"
-S3_BASE_URL="https://rust-lang-ci2.s3.amazonaws.com/rustc-builds"
+ARTIFACTS_BASE_URL="https://ci-artifacts.rust-lang.org/rustc-builds"
 LOCAL_DOCKER_TAG="rust-$TARGET"
 
 # Use images from rustc master
 case "$TARGET" in
   aarch64-unknown-linux-gnu)       image=dist-aarch64-linux ;;
+  aarch64-unknown-linux-musl)      image=dist-arm-linux ;;
   arm-unknown-linux-gnueabi)       image=dist-arm-linux ;;
   arm-unknown-linux-gnueabihf)     image=dist-armhf-linux ;;
   armv7-unknown-linux-gnueabihf)   image=dist-armv7-linux ;;
@@ -30,14 +31,15 @@ case "$TARGET" in
   powerpc64le-unknown-linux-gnu)   image=dist-powerpc64le-linux ;;
   s390x-unknown-linux-gnu)         image=dist-s390x-linux ;;
   x86_64-unknown-freebsd)          image=dist-x86_64-freebsd ;;
+  x86_64-unknown-illumos)          image=dist-x86_64-illumos ;;
   x86_64-unknown-linux-gnu)        image=dist-x86_64-linux ;;
   x86_64-unknown-netbsd)           image=dist-x86_64-netbsd ;;
-  riscv64gc-unknown-linux-gnu)     image=dist-various-1 ;;
+  riscv64gc-unknown-linux-gnu)     image=dist-riscv64-linux ;;
   *) exit ;;
 esac
 
 master=$(git ls-remote "$RUST_REPO" refs/heads/master | cut -f1)
-image_url="$S3_BASE_URL/$master/image-$image.txt"
+image_url="$ARTIFACTS_BASE_URL/$master/image-$image.txt"
 info="/tmp/image-$image.txt"
 
 rm -f "$info"
