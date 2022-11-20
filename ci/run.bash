@@ -7,13 +7,30 @@ export RUST_BACKTRACE=1
 rustc -vV
 cargo -vV
 
-# rustc only supports armv7: https://forge.rust-lang.org/release/platform-support.html
+FEATURES=()
+case "$(uname -s)" in
+  *NT* ) ;; # Windows NT
+  * ) FEATURES+=() ;;
+esac
+
+case "$TARGET" in
+  # these platforms aren't supported by ring:
+  powerpc* ) ;;
+  mips* ) ;;
+  riscv* ) ;;
+  s390x* ) ;;
+  aarch64-pc-windows-msvc ) ;;
+  # default case, build with rustls enabled
+  * ) FEATURES+=() ;;
+esac
+
+# rustc only supports armv7: https://doc.rust-lang.org/nightly/rustc/platform-support.html
 if [ "$TARGET" = arm-linux-androideabi ]; then
   export CFLAGS='-march=armv7'
 fi
 
-cargo build --release --target "$TARGET"
+cargo build --release --target "$TARGET" "${FEATURES[@]}"
 
 if [ -z "$SKIP_TESTS" ]; then
-  cargo test --locked --release --target "$TARGET"
+  cargo test --locked --release --target "$TARGET" "${FEATURES[@]}"
 fi

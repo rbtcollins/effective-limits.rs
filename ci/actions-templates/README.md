@@ -38,6 +38,7 @@ system.
 | armv7-unknown-linux-gnueabihf | Yes        | Two   | Yes    | Yes        |
 | aarch64-linux-android         | Yes        | Two   | Yes    | Yes        |
 | aarch64-unknown-linux-gnu     | Yes        | Two   | No     | Yes        |
+| aarch64-unknown-linux-musl    | Yes        | Two   | No     | Yes        |
 | powerpc64-unknown-linux-gnu   | Yes        | Two   | No     | Yes        |
 | x86_64-unknown-linux-musl     | Yes        | Two   | No     | Yes        |
 | i686-unknown-linux-gnu        | Yes        | One   | No     | No         |
@@ -45,6 +46,7 @@ system.
 | arm-unknown-linux-gnueabihf   | Yes        | Two   | No     | No         |
 | x86_64-unknown-freebsd        | Yes        | Two   | No     | No         |
 | x86_64-unknown-netbsd         | Yes        | Two   | No     | No         |
+| x86_64-unknown-illumos        | Yes        | Two   | No     | No         |
 | powerpc-unknown-linux-gnu     | Yes        | Two   | No     | No         |
 | powerpc64le-unknown-linux-gnu | Yes        | Two   | No     | No         |
 | mips-unknown-linux-gnu        | Yes        | Two   | No     | No         |
@@ -58,12 +60,14 @@ system.
 | x86_64-linux-android          | Yes        | Two   | No     | No         |
 | riscv64gc-unknown-linux-gnu   | Yes        | ---   | No     | No         |
 | ----------------------------- | ---------- | ----- | ------ | ---------- |
+| aarch64-apple-darwin          | Yes        | Two   | Yes    | Yes        |
 | x86_64-apple-darwin           | No         | One   | Yes    | Yes        |
 | ----------------------------- | ---------- | ----- | ------ | ---------- |
 | x86_64-pc-windows-msvc        | No         | One   | Yes    | Yes        |
 | x86_64-pc-windows-gnu         | No         | One   | No     | Yes        |
 | i686-pc-windows-msvc          | No         | One   | No     | No         |
 | i686-pc-windows-gnu           | No         | One   | No     | No         |
+| aarch64-pc-windows-msvc       | Yes        | Two   | No     | Yes        |
 
 We also have a clippy/shellcheck target which runs on x86_64 linux and is
 run in all cases. It does a `cargo fmt` check, a `cargo clippy` check on the
