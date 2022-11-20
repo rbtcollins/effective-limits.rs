@@ -21,6 +21,7 @@ jobs:
       matrix:
         target:
           - x86_64-apple-darwin
+          - aarch64-apple-darwin
     steps:
       - uses: actions/checkout@v2
         with:
@@ -32,7 +33,7 @@ jobs:
       - name: Display the current git status
         run: |
           git status
-          git describe --tags
+          git describe
       - name: Prep cargo dirs
         run: |
           mkdir -p ~/.cargo/{registry,git}
@@ -41,21 +42,25 @@ jobs:
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           echo "TARGET=${{ matrix.target }}" >> $GITHUB_ENV
           echo "SKIP_TESTS=" >> $GITHUB_ENV
-      - name: Cache cargo registry
-        uses: actions/cache@v1
+          echo "LZMA_API_STATIC=1" >> $GITHUB_ENV
+      - name: Cache cargo registry and git trees
+        uses: actions/cache@v2
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-trimmed
-      - name: Cache cargo git trees
-        uses: actions/cache@v1
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-gits-trimmed
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Get rustc commit hash
+        id: cargo-target-cache
+        run: |
+          echo "::set-output name=rust_hash::$(rustc -Vv | grep commit-hash | awk '{print $2}')"
+        shell: bash
       - name: Cache cargo build
-        uses: actions/cache@v1
+        uses: actions/cache@v2
         with:
           path: target
-          key: ${{ runner.os }}-cargo-build-trimmed-${{ matrix.target }}
+          key: ${{ github.base_ref }}-${{ github.head_ref }}-${{ matrix.target }}-cargo-target-dir-${{ steps.cargo-target-cache.outputs.rust_hash }}-${{ hashFiles('**/Cargo.lock') }}-3
+          restore-keys: ${{ github.base_ref }}-${{ matrix.target }}-cargo-target-dir-${{ steps.cargo-target-cache.outputs.rust_hash }}-${{ hashFiles('**/Cargo.lock') }}-3
       - name: Install Rustup
         run: |
           curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain=none --profile=minimal -y
@@ -65,11 +70,51 @@ jobs:
             rustup toolchain uninstall stable
           fi
           rustup toolchain install --profile=minimal stable
+      - name: aarch64-specific items
+        run: |
+          # Use nightly for now
+          rustup toolchain install --profile=minimal nightly
+          rustup default nightly
+
+          # Can't run tests: cross-compiling
+          echo "SKIP_TESTS=yes" >> $GITHUB_ENV
+        if: matrix.target == 'aarch64-apple-darwin'
       - name: Ensure we have our goal target installed
         run: |
           rustup target install "$TARGET"
       - name: Run a full build and test
         run: bash ci/run.bash
+      - name: Dump dynamic link targets
+        run: |
+          otool -L target/${TARGET}/release/rustup-init
+          if otool -L target/${TARGET}/release/rustup-init | grep -q -F /usr/local/; then
+            echo >&2 "Unfortunately there are /usr/local things in the link. Fail."
+            exit 1
+          fi
+      - name: Upload the built artifact
+        if: false
+        uses: actions/upload-artifact@v2
+        with:
+          name: rustup-init-${{ matrix.target }}
+          path: |
+            target/${{ matrix.target }}/release/rustup-init
+          retention-days: 7
+      - name: Acquire the AWS tooling
+        run: |
+          pip3 install awscli
+        if: false && github.event_name == 'push' && github.ref == 'refs/heads/stable'
+      - name: Prepare the dist
+        run: |
+          bash ci/prepare-deploy.bash
+        if: false && github.event_name == 'push' && github.ref == 'refs/heads/stable'
+      - name: Deploy build to dev-static dist tree for release team
+        run: |
+          aws s3 cp --recursive deploy/ s3://dev-static-rust-lang-org/rustup/
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-west-1
+        if: false && github.event_name == 'push' && github.ref == 'refs/heads/stable'
       - name: Clear the cargo caches
         run: |
           cargo install cargo-cache --no-default-features --features ci-autoclean
