@@ -9,7 +9,7 @@
     "labels": [
         "dependencies"
     ],
-    "prCreation": "not-pending",
+    "prCreation": "immediate",
     "stabilityDays": 3,
     "lockFileMaintenance": {
         "enabled": true

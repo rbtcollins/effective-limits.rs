@@ -44,7 +44,7 @@ jobs:
       - name: Display the current git status
         run: |
           git status
-          git describe
+          git describe --tags
       - name: Prep cargo dirs
         run: |
           mkdir -p ~/.cargo/{registry,git}
