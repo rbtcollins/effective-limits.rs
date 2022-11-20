@@ -155,7 +155,7 @@ jobs:
             -c 'PATH="${PATH}":/rustc-sysroot/bin bash ci/run.bash'
       - name: Upload the built artifact
         if: false
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: rustup-init-${{ matrix.target }}
           path: |
