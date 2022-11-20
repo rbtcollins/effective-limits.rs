@@ -37,7 +37,7 @@ jobs:
       - name: Display the current git status
         run: |
           git status
-          git describe --tags
+          git describe
       - name: Prep cargo dirs
         run: |
           New-Item "${env:USERPROFILE}\.cargo\registry" -ItemType Directory -Force
@@ -59,22 +59,25 @@ jobs:
         run: |
           echo "%USERPROFILE%\.cargo\bin" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
           echo "TARGET=${{ matrix.target }}" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
-          echo "SKIP_TESTS=" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
-      - name: Cache cargo registry
-        uses: actions/cache@v1
+          echo "SKIP_TESTS=${{ matrix.skip_tests }}" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
+      - name: Cache cargo registry and git trees
+        uses: actions/cache@v2
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-trimmed
-      - name: Cache cargo git trees
-        uses: actions/cache@v1
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-gits-trimmed
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Get rustc commit hash
+        id: cargo-target-cache
+        run: |
+          echo "::set-output name=rust_hash::$(rustc -Vv | grep commit-hash | awk '{print $2}')"
+        shell: bash
       - name: Cache cargo build
-        uses: actions/cache@v1
+        uses: actions/cache@v2
         with:
           path: target
-          key: ${{ runner.os }}-cargo-build-trimmed-${{ matrix.target }}
+          key: ${{ github.base_ref }}-${{ github.head_ref }}-${{ matrix.target }}-cargo-target-dir-${{ steps.cargo-target-cache.outputs.rust_hash }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ github.base_ref }}-${{ matrix.target }}-cargo-target-dir-${{ steps.cargo-target-cache.outputs.rust_hash }}-${{ hashFiles('**/Cargo.lock') }}
       - name: Install Rustup using win.rustup.rs
         run: |
           # Disable the download progress bar which can cause perf issues
@@ -84,22 +87,38 @@ jobs:
           del rustup-init.exe
         shell: powershell
       - name: Ensure stable toolchain is up to date
-        # Remove `rust-docs` component since `rustup update` will remove and reinstall it
-        # which is slower than just remove it first anyway.
-        run: |
-          rustup component remove rust-docs || echo "already removed"
-          rustup update stable
+        run: rustup update stable
         shell: bash
       - name: Install the target
         run: |
           rustup target install ${{ matrix.target }}
       - name: Run a full build
+        run: bash ci/run.bash
+      - name: Upload the built artifact
+        if: false
+        uses: actions/upload-artifact@v2
+        with:
+          name: rustup-init-${{ matrix.target }}
+          path: |
+            target/${{ matrix.target }}/release/rustup-init.exe
+          retention-days: 7
+      - name: Acquire the AWS tooling
         run: |
-          cargo build --release --target ${{ matrix.target }}
-      - name: Run tests
+          choco upgrade awscli
+        if: false && github.event_name == 'push' && github.ref == 'refs/heads/stable'
+      - name: Prepare the dist
         run: |
-          cargo test --release --target ${{ matrix.target }} --locked
-        if: env.SKIP_TESTS == ''
+          .\ci\prepare-deploy.ps1
+        shell: powershell
+        if: false && github.event_name == 'push' && github.ref == 'refs/heads/stable'
+      - name: Deploy build to dev-static dist tree for release team
+        run: |
+          aws --debug s3 cp --recursive dist s3://dev-static-rust-lang-org/rustup/dist
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-west-1
+        if: false && github.event_name == 'push' && github.ref == 'refs/heads/stable'
       - name: Clear the cargo caches
         run: |
           cargo install cargo-cache --no-default-features --features ci-autoclean
