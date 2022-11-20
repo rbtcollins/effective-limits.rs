@@ -6,6 +6,11 @@
     "git-submodules": {
         "enabled": true
     },
+    "github-actions": {
+        "fileMatch": [
+            "^ci/actions-templates/.*\\.yaml$"
+        ]
+    },
     "labels": [
         "dependencies"
     ],
