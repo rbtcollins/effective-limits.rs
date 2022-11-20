@@ -11,6 +11,7 @@ cfg_if! {
                  target_os="macos",
                  target_os="linux",
                  target_os="freebsd",
+                 target_os="openbsd",
                  target_os="illumos",
                  target_os="solaris",
                 ))] {
@@ -55,7 +56,7 @@ fn min_opt(left: u64, right: Option<u64>) -> u64 {
 }
 
 #[allow(dead_code)]
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os="openbsd")))]
 fn ulimited_memory() -> Result<Option<u64>> {
     let mut out = libc::rlimit {
         rlim_cur: 0,
@@ -94,6 +95,11 @@ fn ulimited_memory() -> Result<Option<u64>> {
     Ok(address_limit
         .or(data_limit)
         .map(|left| min_opt(left, data_limit)))
+}
+
+#[cfg(target_os="openbsd")]
+fn ulimited_memory() -> Result<Option<u64>> {
+    Ok(None)
 }
 
 #[cfg(not(unix))]
@@ -162,6 +168,7 @@ pub fn memory_limit() -> Result<u64> {
                      target_os="macos",
                      target_os="linux",
                      target_os="freebsd",
+                     target_os="openbsd",
                      target_os="illumos",
                      target_os="solaris",
                     ))] {
