@@ -85,6 +85,7 @@ jobs:
       - name: Run a full build and test
         run: bash ci/run.bash
       - name: Dump dynamic link targets
+        if: false
         run: |
           otool -L target/${TARGET}/release/rustup-init
           if otool -L target/${TARGET}/release/rustup-init | grep -q -F /usr/local/; then
