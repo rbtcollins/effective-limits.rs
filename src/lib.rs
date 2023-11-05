@@ -377,7 +377,7 @@ mod tests {
                     unsafe {
                         cmd.pre_exec(move || {
                             let lim = libc::rlimit {
-                                rlim_cur: ulimit,
+                                rlim_cur: ulimit as _,
                                 rlim_max: libc::RLIM_INFINITY,
                             };
                             match libc::setrlimit(rlimit_as, &lim as *const libc::rlimit) {
