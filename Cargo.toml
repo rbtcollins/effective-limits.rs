@@ -21,7 +21,7 @@ thiserror = "1.0.37"
 sys-info = "0.9.1"
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2.137"
+libc = "0.2.154"
 
 
 [target."cfg(windows)".dependencies]
