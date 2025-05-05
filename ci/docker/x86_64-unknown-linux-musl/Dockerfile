@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
 COPY ci/docker/scripts/sccache.bash /scripts/
 
