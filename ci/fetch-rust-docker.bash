@@ -44,16 +44,11 @@ info="/tmp/image-$image.txt"
 
 rm -f "$info"
 curl -o "$info" "$image_url"
-digest=$(grep -m1 ^sha "$info")
+digest=$(cut -d: -f 2 "$info")
 
 if [ -z "$(docker images -q "${LOCAL_DOCKER_TAG}")" ]; then
-  url=$(grep -m1 ^https "$info")
-  cache=/tmp/rustci_docker_cache
-  echo "Attempting to download $url"
-  rm -f "$cache"
   set +e
-  command_retry curl -y 30 -Y 10 --connect-timeout 30 -f -L -C - -o "$cache" "$url"
+  docker pull $(cat "$info")
   set -e
-  docker load --quiet -i "$cache"
-  docker tag "$digest" "${LOCAL_DOCKER_TAG}"
+  docker tag $(cat "$info") "${LOCAL_DOCKER_TAG}"
 fi
