@@ -4,9 +4,9 @@
 name: Windows (master) # skip-pr skip-stable
 
 on:
-  push:         # skip-pr
-    branches:   # skip-pr
-      - master  # skip-pr skip-stable
+  push: # skip-pr
+    branches: # skip-pr
+      - master # skip-pr skip-stable
   schedule: # skip-pr skip-stable
     - cron: "30 0 * * 1" # Every Monday at half past midnight UTC skip-pr skip-stable
 
@@ -102,7 +102,7 @@ jobs:
         run: bash ci/run.bash
       - name: Upload the built artifact
         if: false
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: rustup-init-${{ matrix.target }}
           path: |

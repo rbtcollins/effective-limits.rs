@@ -4,9 +4,9 @@
 name: Windows (stable) # skip-master skip-pr
 
 on:
-  push:         # skip-pr
-    branches:   # skip-pr
-      - stable  # skip-pr skip-master
+  push: # skip-pr
+    branches: # skip-pr
+      - stable # skip-pr skip-master
 
 jobs:
   build:
@@ -99,7 +99,7 @@ jobs:
         run: bash ci/run.bash
       - name: Upload the built artifact
         if: false
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: rustup-init-${{ matrix.target }}
           path: |
