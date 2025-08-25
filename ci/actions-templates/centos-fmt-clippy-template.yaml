@@ -78,7 +78,7 @@ jobs:
             --tty \
             --init \
             --rm \
-            centos:6 \
+            centos:centos7 \
             sh ./ci/raw_init.sh
       - name: Run formatting checks
         run: |
