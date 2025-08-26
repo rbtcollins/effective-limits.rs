@@ -14,7 +14,7 @@ version = "0.5.5"
 cfg-if = "1"
 thiserror = "2"
 
-[target.'cfg(any(windows, target_os="macos", target_os="linux", target_os="freebsd", target_os="illumos", target_os="solaris", target_os="netbsd"))'.dependencies]
+[target.'cfg(any(windows, target_os="macos", target_os="linux", target_os="freebsd", target_os="illumos", target_os="solaris", target_os="netbsd", target_os="openbsd"))'.dependencies]
 sys-info = "0.9.1"
 
 [target.'cfg(unix)'.dependencies]
