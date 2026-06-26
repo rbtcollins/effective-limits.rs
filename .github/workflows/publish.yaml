@@ -20,7 +20,7 @@ jobs:
       # Use caching to speed up your build
       - name: Cache publish-action bin
         id: cache-publish-action
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         env:
           cache-name: cache-publish-action
         with:
