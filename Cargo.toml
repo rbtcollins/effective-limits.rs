@@ -22,27 +22,9 @@ libc = "0.2.137"
 
 
 [target."cfg(windows)".dependencies]
-winapi = { version = "0.3.9", features = [
-    "combaseapi",
-    "errhandlingapi",
-    "fileapi",
-    "handleapi",
-    "impl-default",
-    "ioapiset",
-    "jobapi",
-    "jobapi2",
-    "minwindef",
-    "processthreadsapi",
-    "psapi",
-    "shlobj",
-    "shtypes",
-    "synchapi",
-    "sysinfoapi",
-    "tlhelp32",
-    "userenv",
-    "winbase",
-    "winerror",
-    "winioctl",
-    "winnt",
-    "winuser",
-] }
+windows-link = "0.100"
+
+[dev-dependencies]
+similar-asserts = "2"
+windows-bindgen = "0.100"
+

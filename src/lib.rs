@@ -3,8 +3,29 @@
 #![recursion_limit = "1024"]
 
 use std::cmp::min;
+#[cfg(windows)]
+use std::ffi::c_void;
+#[cfg(windows)]
+use std::mem::size_of;
+#[cfg(windows)]
+use std::ptr;
 
 use cfg_if::cfg_if;
+
+#[cfg(windows)]
+#[allow(
+    dead_code,
+    non_snake_case,
+    non_upper_case_globals,
+    clippy::upper_case_acronyms
+)]
+pub(crate) mod win_bindings;
+#[cfg(windows)]
+use win_bindings::{
+    GetCurrentProcess, IsProcessInJob, JobObjectExtendedLimitInformation,
+    QueryInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+    JOB_OBJECT_LIMIT_PROCESS_MEMORY,
+};
 
 cfg_if! {
     if #[cfg(any(windows,
@@ -97,58 +118,43 @@ fn ulimited_memory() -> Result<Option<u64>> {
         .map(|left| min_opt(left, data_limit)))
 }
 
-#[cfg(not(unix))]
-fn win_err<T>(fn_name: &str) -> Result<T> {
+#[cfg(windows)]
+pub(crate) fn win_err<T>(fn_name: &str) -> Result<T> {
     Err(Error::IoExplainedError(
         std::io::Error::last_os_error(),
         fn_name.into(),
     ))
 }
 
-#[cfg(not(unix))]
-fn ulimited_memory() -> Result<Option<u64>> {
-    use std::mem::size_of;
-
-    use winapi::shared::minwindef::{FALSE, LPVOID};
-    use winapi::shared::ntdef::NULL;
-    use winapi::um::jobapi::IsProcessInJob;
-    use winapi::um::jobapi2::QueryInformationJobObject;
-    use winapi::um::processthreadsapi::GetCurrentProcess;
-    use winapi::um::winnt::{
-        JobObjectExtendedLimitInformation, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-        JOB_OBJECT_LIMIT_PROCESS_MEMORY,
-    };
-
+#[cfg(windows)]
+pub(crate) fn ulimited_memory() -> Result<Option<u64>> {
     let mut in_job = 0;
-    match unsafe { IsProcessInJob(GetCurrentProcess(), NULL, &mut in_job) } {
-        FALSE => win_err("IsProcessInJob"),
-        _ => Ok(()),
-    }?;
-    if in_job == FALSE {
+    if unsafe { IsProcessInJob(GetCurrentProcess(), ptr::null_mut(), &mut in_job) } == 0 {
+        return win_err("IsProcessInJob");
+    }
+    if in_job == 0 {
         return Ok(None);
     }
-    let mut job_info = winapi::um::winnt::JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
-        ..Default::default()
-    };
-    let mut written: u32 = 0;
-    match unsafe {
+
+    let mut job_info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+    let mut written = 0;
+    if unsafe {
         QueryInformationJobObject(
-            NULL,
+            ptr::null_mut(),
             JobObjectExtendedLimitInformation,
-            &mut job_info as *mut JOBOBJECT_EXTENDED_LIMIT_INFORMATION as LPVOID,
+            &mut job_info as *mut JOBOBJECT_EXTENDED_LIMIT_INFORMATION as *mut c_void,
             size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
             &mut written,
         )
-    } {
-        FALSE => win_err("QueryInformationJobObject"),
-        _ => Ok(()),
-    }?;
-    if job_info.BasicLimitInformation.LimitFlags & JOB_OBJECT_LIMIT_PROCESS_MEMORY
-        == JOB_OBJECT_LIMIT_PROCESS_MEMORY
+    } == 0
     {
-        Ok(Some(job_info.ProcessMemoryLimit as u64))
-    } else {
-        Ok(None)
+        return win_err("QueryInformationJobObject");
+    }
+
+    let flags = job_info.BasicLimitInformation.LimitFlags;
+    match flags & JOB_OBJECT_LIMIT_PROCESS_MEMORY as u32 == JOB_OBJECT_LIMIT_PROCESS_MEMORY as u32 {
+        true => Ok(Some(job_info.ProcessMemoryLimit as u64)),
+        false => Ok(None),
     }
 }
 
@@ -190,9 +196,9 @@ mod tests {
     use std::str;
 
     #[cfg(windows)]
-    use winapi::shared::minwindef::{DWORD, FALSE, LPVOID};
+    use crate::windows::bindings::*;
     #[cfg(windows)]
-    use winapi::shared::ntdef::NULL;
+    use crate::windows::win_err;
 
     use super::*;
 
@@ -235,42 +241,38 @@ mod tests {
             Some(ulimit) => {
                 #[cfg(windows)]
                 {
+                    use std::ffi::c_void;
                     use std::mem::size_of;
                     use std::process::Stdio;
+                    use std::ptr;
 
-                    cmd.creation_flags(winapi::um::winbase::CREATE_SUSPENDED);
-                    let job = match unsafe {
-                        winapi::um::winbase::CreateJobObjectA(
-                            NULL as *mut winapi::um::minwinbase::SECURITY_ATTRIBUTES,
-                            NULL as *const i8,
-                        )
-                    } {
-                        NULL => win_err("CreateJobObjectA"),
-                        handle => Ok(handle),
-                    }?;
-                    let mut job_info = winapi::um::winnt::JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
-                        BasicLimitInformation:
-                            winapi::um::winnt::JOBOBJECT_BASIC_LIMIT_INFORMATION {
-                                LimitFlags: winapi::um::winnt::JOB_OBJECT_LIMIT_PROCESS_MEMORY,
-                                ..Default::default()
-                            },
+                    cmd.creation_flags(CREATE_SUSPENDED as u32);
+                    let job = unsafe { CreateJobObjectA(ptr::null(), ptr::null()) };
+                    if job.is_null() {
+                        return win_err("CreateJobObjectA");
+                    }
+
+                    let job_info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
+                        BasicLimitInformation: JOBOBJECT_BASIC_LIMIT_INFORMATION {
+                            LimitFlags: JOB_OBJECT_LIMIT_PROCESS_MEMORY as u32,
+                            ..Default::default()
+                        },
                         ProcessMemoryLimit: ulimit as usize,
                         ..Default::default()
                     };
-                    match unsafe {
-                        winapi::um::jobapi2::SetInformationJobObject(
+                    if unsafe {
+                        SetInformationJobObject(
                             job,
-                            winapi::um::winnt::JobObjectExtendedLimitInformation,
-                            &mut job_info
-                                as *mut winapi::um::winnt::JOBOBJECT_EXTENDED_LIMIT_INFORMATION
-                                as LPVOID,
-                            size_of::<winapi::um::winnt::JOBOBJECT_EXTENDED_LIMIT_INFORMATION>()
-                                as u32,
+                            JobObjectExtendedLimitInformation,
+                            &job_info as *const JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+                                as *const c_void,
+                            size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
                         )
-                    } {
-                        FALSE => win_err("SetInformationJobObject"),
-                        _ => Ok(()),
-                    }?;
+                    } == 0
+                    {
+                        return win_err("SetInformationJobObject");
+                    }
+
                     let child = cmd
                         .stdin(Stdio::null())
                         .stdout(Stdio::piped())
@@ -279,85 +281,67 @@ mod tests {
                         .map_err(|e| {
                             crate::Error::IoExplainedError(e, "error spawning helper".into())
                         })?;
-                    let childhandle = match unsafe {
-                        winapi::um::processthreadsapi::OpenProcess(
-                            winapi::um::winnt::JOB_OBJECT_ASSIGN_PROCESS
+                    let childhandle = unsafe {
+                        OpenProcess(
+                            (JOB_OBJECT_ASSIGN_PROCESS
                         // The docs say only JOB_OBJECT_ASSIGN_PROCESS is
                         // needed, but access denied is returned unless more
                         // permissions are requested, and the actual set needed
                         // is not documented.
-                            | winapi::um::winnt::PROCESS_ALL_ACCESS,
-                            FALSE,
+                            | PROCESS_ALL_ACCESS) as u32,
+                            0,
                             child.id(),
                         )
-                    } {
-                        NULL => win_err("OpenProcess"),
-                        handle => Ok(handle),
-                    }?;
-                    println!("assigning job {} pid {}", job as u32, childhandle as u32);
-                    let res =
-                        unsafe { winapi::um::jobapi2::AssignProcessToJobObject(job, childhandle) };
-                    match res {
-                        FALSE => win_err("AssignProcessToJobObject"),
-                        _ => Ok(()),
-                    }?;
-                    let mut tid: DWORD = 0;
-                    let tool = match unsafe {
-                        winapi::um::tlhelp32::CreateToolhelp32Snapshot(
-                            winapi::um::tlhelp32::TH32CS_SNAPTHREAD,
-                            0,
-                        )
-                    } {
-                        winapi::um::handleapi::INVALID_HANDLE_VALUE => {
-                            win_err("CreateToolhelp32Snapshot")
-                        }
-                        handle => Ok(handle),
-                    }?;
-                    let mut te = winapi::um::tlhelp32::THREADENTRY32 {
-                        dwSize: size_of::<winapi::um::tlhelp32::THREADENTRY32>() as u32,
+                    };
+                    if childhandle.is_null() {
+                        return win_err("OpenProcess");
+                    }
+
+                    println!("assigning job {:?} pid {}", job, child.id());
+                    if unsafe { AssignProcessToJobObject(job, childhandle) } == 0 {
+                        return win_err("AssignProcessToJobObject");
+                    }
+
+                    let mut tid = 0;
+                    let tool = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD as u32, 0) };
+                    if tool == INVALID_HANDLE_VALUE {
+                        return win_err("CreateToolhelp32Snapshot");
+                    }
+
+                    let mut te = THREADENTRY32 {
+                        dwSize: size_of::<THREADENTRY32>() as u32,
                         ..Default::default()
                     };
-                    match unsafe { winapi::um::tlhelp32::Thread32First(tool, &mut te) } {
-                        FALSE => win_err("Thread32First"),
-                        _ => Ok(()),
-                    }?;
+                    if unsafe { Thread32First(tool, &mut te) } == 0 {
+                        return win_err("Thread32First");
+                    }
                     while {
                         if te.dwSize >= 16 /* owner proc id field offset */ &&te.th32OwnerProcessID == child.id()
                         {
                             tid = te.th32ThreadID;
                             // a break here would be nice.
                         };
-                        te.dwSize = size_of::<winapi::um::tlhelp32::THREADENTRY32>() as u32;
-                        match unsafe { winapi::um::tlhelp32::Thread32Next(tool, &mut te) } {
-                            FALSE => {
-                                let err = unsafe { winapi::um::errhandlingapi::GetLastError() };
-                                match err {
-                                    winapi::shared::winerror::ERROR_NO_MORE_FILES => Ok(false),
-                                    _ => win_err("Thread32Next"),
-                                }
-                            }
+                        te.dwSize = size_of::<THREADENTRY32>() as u32;
+                        match unsafe { Thread32Next(tool, &mut te) } {
+                            0 => match unsafe { GetLastError() } {
+                                e if e == ERROR_NO_MORE_FILES as u32 => Ok(false),
+                                _ => win_err("Thread32Next"),
+                            },
                             _ => Ok(true),
                         }?
                     } {}
-                    match unsafe { winapi::um::handleapi::CloseHandle(tool) } {
-                        FALSE => win_err("CloseHandle"),
-                        _ => Ok(()),
-                    }?;
-                    let thread = match unsafe {
-                        winapi::um::processthreadsapi::OpenThread(
-                            winapi::um::winnt::THREAD_SUSPEND_RESUME,
-                            FALSE,
-                            tid,
-                        )
-                    } {
-                        NULL => win_err("OpenThread"),
-                        handle => Ok(handle),
-                    }?;
+                    if unsafe { CloseHandle(tool) } == 0 {
+                        return win_err("CloseHandle");
+                    }
 
-                    match unsafe { winapi::um::processthreadsapi::ResumeThread(thread) } {
-                        std::u32::MAX => win_err("ResumeThread"),
-                        _ => Ok(()),
-                    }?;
+                    let thread = unsafe { OpenThread(THREAD_SUSPEND_RESUME as u32, 0, tid) };
+                    if thread.is_null() {
+                        return win_err("OpenThread");
+                    }
+                    if unsafe { ResumeThread(thread) } == u32::MAX {
+                        return win_err("ResumeThread");
+                    }
+
                     child.wait_with_output().map_err(|e| {
                         crate::Error::IoExplainedError(e, "error waiting for child".into())
                     })?
