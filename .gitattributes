@@ -1,0 +1,3 @@
+# windows-bindgen always writes LF line endings; keep the checked-in copy
+# identical on Windows so tests/codegen.rs doesn't see a spurious diff.
+src/win_bindings.rs text eol=lf

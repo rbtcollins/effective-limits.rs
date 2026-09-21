@@ -90,7 +90,10 @@ jobs:
           del rustup-init.exe
         shell: powershell
       - name: Ensure stable toolchain is up to date
-        run: rustup update stable
+        run: |
+          rustup update stable
+          # rustfmt is needed by the windows-bindgen codegen test
+          rustup component add rustfmt
         shell: bash
       - name: Install the target
         run: |

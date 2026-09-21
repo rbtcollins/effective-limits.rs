@@ -107,7 +107,8 @@ jobs:
           if rustc +stable -vV >/dev/null 2>/dev/null; then
             rustup toolchain uninstall stable
           fi
-          rustup toolchain install --profile=minimal stable
+          # rustfmt is needed by the windows-bindgen codegen test
+          rustup toolchain install --profile=minimal --component rustfmt stable
       - name: Ensure we have our goal target installed
         run: |
           rustup target install "$TARGET"

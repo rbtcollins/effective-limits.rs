@@ -3,8 +3,29 @@
 #![recursion_limit = "1024"]
 
 use std::cmp::min;
+#[cfg(windows)]
+use std::ffi::c_void;
+#[cfg(windows)]
+use std::mem::size_of;
+#[cfg(windows)]
+use std::ptr;
 
 use cfg_if::cfg_if;
+
+#[cfg(windows)]
+#[allow(
+    dead_code,
+    non_snake_case,
+    non_upper_case_globals,
+    clippy::upper_case_acronyms
+)]
+pub(crate) mod win_bindings;
+#[cfg(windows)]
+use win_bindings::{
+    GetCurrentProcess, IsProcessInJob, JobObjectExtendedLimitInformation,
+    QueryInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+    JOB_OBJECT_LIMIT_PROCESS_MEMORY,
+};
 
 cfg_if! {
     if #[cfg(any(windows,
@@ -121,48 +142,33 @@ pub mod testsupport {
 
 #[cfg(not(unix))]
 fn ulimited_memory() -> Result<Option<u64>> {
-    use std::mem::size_of;
-
-    use winapi::shared::minwindef::{FALSE, LPVOID};
-    use winapi::shared::ntdef::NULL;
-    use winapi::um::jobapi::IsProcessInJob;
-    use winapi::um::jobapi2::QueryInformationJobObject;
-    use winapi::um::processthreadsapi::GetCurrentProcess;
-    use winapi::um::winnt::{
-        JobObjectExtendedLimitInformation, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-        JOB_OBJECT_LIMIT_PROCESS_MEMORY,
-    };
-
     let mut in_job = 0;
-    match unsafe { IsProcessInJob(GetCurrentProcess(), NULL, &mut in_job) } {
-        FALSE => win_err("IsProcessInJob"),
-        _ => Ok(()),
-    }?;
-    if in_job == FALSE {
+    if unsafe { IsProcessInJob(GetCurrentProcess(), ptr::null_mut(), &mut in_job) } == 0 {
+        return win_err("IsProcessInJob");
+    }
+    if in_job == 0 {
         return Ok(None);
     }
-    let mut job_info = winapi::um::winnt::JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
-        ..Default::default()
-    };
-    let mut written: u32 = 0;
-    match unsafe {
+
+    let mut job_info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+    let mut written = 0;
+    if unsafe {
         QueryInformationJobObject(
-            NULL,
+            ptr::null_mut(),
             JobObjectExtendedLimitInformation,
-            &mut job_info as *mut JOBOBJECT_EXTENDED_LIMIT_INFORMATION as LPVOID,
+            &mut job_info as *mut JOBOBJECT_EXTENDED_LIMIT_INFORMATION as *mut c_void,
             size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
             &mut written,
         )
-    } {
-        FALSE => win_err("QueryInformationJobObject"),
-        _ => Ok(()),
-    }?;
-    if job_info.BasicLimitInformation.LimitFlags & JOB_OBJECT_LIMIT_PROCESS_MEMORY
-        == JOB_OBJECT_LIMIT_PROCESS_MEMORY
+    } == 0
     {
-        Ok(Some(job_info.ProcessMemoryLimit as u64))
-    } else {
-        Ok(None)
+        return win_err("QueryInformationJobObject");
+    }
+
+    let flags = job_info.BasicLimitInformation.LimitFlags;
+    match flags & JOB_OBJECT_LIMIT_PROCESS_MEMORY as u32 == JOB_OBJECT_LIMIT_PROCESS_MEMORY as u32 {
+        true => Ok(Some(job_info.ProcessMemoryLimit as u64)),
+        false => Ok(None),
     }
 }
 
