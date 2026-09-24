@@ -33,11 +33,11 @@ jobs:
           - i686-pc-windows-gnu # skip-pr skip-master
         include:
           - target: x86_64-pc-windows-gnu
-            mingw: https://ci-mirrors.rust-lang.org/rustc/x86_64-6.3.0-release-posix-seh-rt_v5-rev2.7z
+            mingw: https://ci-mirrors.rust-lang.org/rustc/x86_64-14.2.0-release-posix-seh-msvcrt-rt_v12-rev2.7z
             mingwdir: mingw64
           - target: i686-pc-windows-gnu
             mingwdir: mingw32
-            mingw: https://ci-mirrors.rust-lang.org/rustc/i686-6.3.0-release-posix-dwarf-rt_v5-rev2.7z
+            mingw: https://ci-mirrors.rust-lang.org/rustc/i686-14.2.0-release-posix-dwarf-msvcrt-rt_v12-rev2.7z
           - target: aarch64-pc-windows-msvc # skip-pr skip-stable
             skip_tests: yes # skip-pr skip-stable
     steps:

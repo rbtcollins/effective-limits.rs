@@ -38,13 +38,17 @@ case "$TARGET" in
   *) exit ;;
 esac
 
-master=$(git ls-remote "$RUST_REPO" refs/heads/master | cut -f1)
-image_url="$ARTIFACTS_BASE_URL/$master/image-$image.txt"
+# Resolve the default branch's commit without hardcoding its name
+head=$(git ls-remote "$RUST_REPO" HEAD | cut -f1)
+if [ -z "$head" ]; then
+  echo "failed to resolve HEAD of $RUST_REPO" >&2
+  exit 1
+fi
+image_url="$ARTIFACTS_BASE_URL/$head/image-$image.txt"
 info="/tmp/image-$image.txt"
 
 rm -f "$info"
-curl -o "$info" "$image_url"
-digest=$(cut -d: -f 2 "$info")
+curl --fail -o "$info" "$image_url"
 
 if [ -z "$(docker images -q "${LOCAL_DOCKER_TAG}")" ]; then
   set +e
