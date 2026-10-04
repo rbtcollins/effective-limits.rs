@@ -3,12 +3,12 @@ authors = ["Robert Collins <robertc@robertcollins.net>"]
 categories = ["config", "memory-management"]
 description = "Estimate effective resource limits for a process e.g. how much RAM is available for use."
 edition = "2018"
-keywords = ["mem", "limits", "effective", "resource"]
+keywords = ["effective", "limits", "mem", "resource"]
 license = "Apache-2.0"
 name = "effective-limits"
 readme = "README.md"
 repository = "https://github.com/rbtcollins/effective-limits.rs"
-version = "0.5.5"
+version = "0.6.0"
 
 [features]
 # Exposes testsupport for tests/; not for end users.
