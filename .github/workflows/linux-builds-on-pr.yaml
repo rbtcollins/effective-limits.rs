@@ -11,7 +11,7 @@ on:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -19,12 +19,19 @@ jobs:
           - x86_64-unknown-linux-gnu
           - armv7-unknown-linux-gnueabihf
           - aarch64-linux-android
-          - x86_64-unknown-freebsd        # skip-master
-          - x86_64-unknown-netbsd         # skip-master
+          - aarch64-unknown-linux-gnu
+          - powerpc64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
+          - x86_64-unknown-freebsd
+          - x86_64-unknown-netbsd
         include:
           - target: x86_64-unknown-linux-gnu
             run_tests: YES
             #snap_arch: amd64
+          - target: aarch64-unknown-linux-gnu
+            # rust-lang/rust builds this image natively on arm64 runners.
+            os: ubuntu-24.04-arm
+            #snap_arch: arm64
           - target: armv7-unknown-linux-gnueabihf
             #snap_arch: armhf
     steps:
