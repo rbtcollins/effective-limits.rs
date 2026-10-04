@@ -65,7 +65,7 @@ jobs:
             #snap_arch: s390x # skip-pr skip-master
     steps:
       - name: Clone repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # v2 defaults to a shallow checkout, but we need at least to the previous tag
           fetch-depth: 0
@@ -88,7 +88,7 @@ jobs:
           echo "SKIP_TESTS=yes" >> $GITHUB_ENV
         if: matrix.run_tests == ''
       - name: Cache cargo registry and git trees
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -100,7 +100,7 @@ jobs:
           echo "::set-output name=rust_hash::$(rustc -Vv | grep commit-hash | awk '{print $2}')"
         shell: bash
       - name: Cache cargo build
-        uses: actions/cache@v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: target
           key: ${{ github.base_ref }}-${{ github.head_ref }}-${{ matrix.target }}-cargo-target-dir-${{ steps.cargo-target-cache.outputs.rust_hash }}-${{ hashFiles('**/Cargo.lock') }}
@@ -155,7 +155,7 @@ jobs:
             -c 'PATH="${PATH}":/rustc-sysroot/bin bash ci/run.bash'
       - name: Upload the built artifact
         if: false
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: rustup-init-${{ matrix.target }}
           path: |
