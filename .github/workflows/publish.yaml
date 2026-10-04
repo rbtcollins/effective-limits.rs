@@ -1,41 +1,59 @@
-name: Publish to Cargo
+name: Publish to crates.io
 
 on:
   push:
-    branches: [main, master]
+    branches: [master]
+
+# Publishes when the version in Cargo.toml is not yet on crates.io, then
+# tags the commit as v<version>. Authentication uses crates.io Trusted
+# Publishing (GitHub OIDC), so no long-lived token is stored.
+
+permissions:
+  contents: write
+  id-token: write
 
 jobs:
   publish:
+    name: publish
     runs-on: ubuntu-latest
-
-    name: "publish"
-
-    # Reference your environment variables
     environment: cargo
 
     steps:
-      - name: checkout
+      - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Use caching to speed up your build
-      - name: Cache publish-action bin
-        id: cache-publish-action
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        env:
-          cache-name: cache-publish-action
-        with:
-          path: ~/.cargo
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-v0.1.13
+      - name: Determine whether this version is already published
+        id: version
+        run: |
+          set -eu
+          version=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name == "effective-limits") | .version')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Sparse index entry for the crate: one JSON object per published version.
+          if curl -sSf https://index.crates.io/ef/fe/effective-limits \
+             | jq -e --arg v "$version" 'select(.vers == $v)' >/dev/null; then
+            echo "effective-limits $version is already on crates.io; nothing to do"
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "effective-limits $version is not on crates.io; publishing"
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
 
-      # install publish-action by cargo in github action
-      - name: Install publish-action
-        if: steps.cache-publish-action.outputs.cache-hit != 'true'
-        run: cargo install publish-action --version=0.1.13
+      - name: Authenticate with crates.io
+        if: steps.version.outputs.new == 'true'
+        id: auth
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
 
-      - name: Publish to cargo
-        run: publish-action
+      - name: Publish
+        if: steps.version.outputs.new == 'true'
+        run: cargo publish --locked
         env:
-          # This can help you tagging the github repository
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # This can help you publish to crates.io
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+      - name: Tag the release
+        if: steps.version.outputs.new == 'true'
+        run: |
+          set -eu
+          tag="v${{ steps.version.outputs.version }}"
+          git tag "$tag" "$GITHUB_SHA"
+          git push origin "$tag"
