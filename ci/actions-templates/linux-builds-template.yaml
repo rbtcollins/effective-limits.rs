@@ -19,7 +19,7 @@ on:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -56,6 +56,8 @@ jobs:
           - target: i686-unknown-linux-gnu # skip-pr skip-master
             #snap_arch: i386  # skip-pr skip-master
           - target: aarch64-unknown-linux-gnu
+            # rust-lang/rust builds this image natively on arm64 runners.
+            os: ubuntu-24.04-arm
             #snap_arch: arm64
           - target: armv7-unknown-linux-gnueabihf
             #snap_arch: armhf
