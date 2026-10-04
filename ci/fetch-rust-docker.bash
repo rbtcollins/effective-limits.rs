@@ -13,11 +13,11 @@ RUST_REPO="https://github.com/rust-lang/rust"
 ARTIFACTS_BASE_URL="https://ci-artifacts.rust-lang.org/rustc-builds"
 LOCAL_DOCKER_TAG="rust-$TARGET"
 
-# Use images from rustc master
+# Image names follow src/ci/docker/host-x86_64/ in rust-lang/rust.
 case "$TARGET" in
   aarch64-unknown-linux-gnu)       image=dist-aarch64-linux ;;
-  aarch64-unknown-linux-musl)      image=dist-arm-linux ;;
-  arm-unknown-linux-gnueabi)       image=dist-arm-linux ;;
+  aarch64-unknown-linux-musl)      image=dist-arm-linux-musl ;;
+  arm-unknown-linux-gnueabi)       image=dist-arm-linux-gnueabi ;;
   arm-unknown-linux-gnueabihf)     image=dist-armhf-linux ;;
   armv7-unknown-linux-gnueabihf)   image=dist-armv7-linux ;;
   i686-unknown-linux-gnu)          image=dist-i686-linux ;;
@@ -27,14 +27,14 @@ case "$TARGET" in
   mips64el-unknown-linux-gnuabi64) image=dist-mips64el-linux ;;
   mipsel-unknown-linux-gnu)        image=dist-mipsel-linux ;;
   powerpc-unknown-linux-gnu)       image=dist-powerpc-linux ;;
-  powerpc64-unknown-linux-gnu)     image=dist-powerpc64-linux ;;
-  powerpc64le-unknown-linux-gnu)   image=dist-powerpc64le-linux ;;
+  powerpc64-unknown-linux-gnu)     image=dist-powerpc64-linux-gnu ;;
+  powerpc64le-unknown-linux-gnu)   image=dist-powerpc64le-linux-gnu ;;
   s390x-unknown-linux-gnu)         image=dist-s390x-linux ;;
   x86_64-unknown-freebsd)          image=dist-x86_64-freebsd ;;
   x86_64-unknown-illumos)          image=dist-x86_64-illumos ;;
   x86_64-unknown-linux-gnu)        image=dist-x86_64-linux ;;
   x86_64-unknown-netbsd)           image=dist-x86_64-netbsd ;;
-  riscv64gc-unknown-linux-gnu)     image=dist-riscv64-linux ;;
+  riscv64gc-unknown-linux-gnu)     image=dist-riscv64-linux-gnu ;;
   *) exit ;;
 esac
 
