@@ -21,15 +21,17 @@ jobs:
           - x86_64-unknown-linux-gnu
           - armv7-unknown-linux-gnueabihf
           - aarch64-linux-android
-          - aarch64-unknown-linux-gnu     # skip-pr
-          - powerpc64-unknown-linux-gnu   # skip-pr
-          - x86_64-unknown-linux-musl     # skip-pr
+          - aarch64-unknown-linux-gnu
+          - powerpc64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
+          - x86_64-unknown-freebsd
+          - x86_64-unknown-netbsd
         include:
           - target: x86_64-unknown-linux-gnu
             run_tests: YES
             #snap_arch: amd64
-          - target: aarch64-unknown-linux-gnu # skip-pr
-            #snap_arch: arm64 # skip-pr
+          - target: aarch64-unknown-linux-gnu
+            #snap_arch: arm64
           - target: armv7-unknown-linux-gnueabihf
             #snap_arch: armhf
     steps:
