@@ -85,6 +85,6 @@ jobs:
           cargo fmt --all --check
       - name: Run cargo check and clippy
         run: |
-          cargo check --all --all-targets
+          cargo check --all --all-targets --features integration_tests
           git ls-files -- '*.rs' | xargs touch
-          cargo clippy --all --all-targets
+          cargo clippy --all --all-targets --features integration_tests

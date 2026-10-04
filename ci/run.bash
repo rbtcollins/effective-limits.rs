@@ -32,5 +32,5 @@ fi
 cargo build --release --target "$TARGET" "${FEATURES[@]}"
 
 if [ -z "$SKIP_TESTS" ]; then
-  cargo test --locked --release --target "$TARGET" "${FEATURES[@]}"
+  cargo test --locked --release --target "$TARGET" --features integration_tests "${FEATURES[@]}"
 fi
