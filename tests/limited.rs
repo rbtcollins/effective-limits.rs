@@ -12,9 +12,23 @@ use std::process::Command;
 use std::str;
 
 #[cfg(windows)]
-use winapi::shared::minwindef::{DWORD, FALSE, LPVOID};
+#[allow(
+    dead_code,
+    non_snake_case,
+    non_upper_case_globals,
+    clippy::upper_case_acronyms
+)]
+#[path = "../src/win_bindings.rs"]
+mod win_bindings;
 #[cfg(windows)]
-use winapi::shared::ntdef::NULL;
+use win_bindings::{
+    AssignProcessToJobObject, CloseHandle, CreateJobObjectA, CreateToolhelp32Snapshot,
+    GetLastError, JobObjectExtendedLimitInformation, OpenProcess, OpenThread, ResumeThread,
+    SetInformationJobObject, Thread32First, Thread32Next, CREATE_SUSPENDED, ERROR_NO_MORE_FILES,
+    INVALID_HANDLE_VALUE, JOBOBJECT_BASIC_LIMIT_INFORMATION, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+    JOB_OBJECT_ASSIGN_PROCESS, JOB_OBJECT_LIMIT_PROCESS_MEMORY, PROCESS_ALL_ACCESS,
+    TH32CS_SNAPTHREAD, THREADENTRY32, THREAD_SUSPEND_RESUME,
+};
 
 #[cfg(unix)]
 use cfg_if::cfg_if;
@@ -40,38 +54,33 @@ fn read_test_process(ulimit: Option<u64>) -> Result<u64> {
         Some(ulimit) => {
             #[cfg(windows)]
             {
+                use std::ffi::c_void;
                 use std::mem::size_of;
                 use std::process::Stdio;
+                use std::ptr;
 
-                cmd.creation_flags(winapi::um::winbase::CREATE_SUSPENDED);
-                let job = match unsafe {
-                    winapi::um::winbase::CreateJobObjectA(
-                        NULL as *mut winapi::um::minwinbase::SECURITY_ATTRIBUTES,
-                        NULL as *const i8,
-                    )
-                } {
-                    NULL => win_err("CreateJobObjectA"),
+                cmd.creation_flags(CREATE_SUSPENDED as u32);
+                let job = match unsafe { CreateJobObjectA(ptr::null(), ptr::null()) } {
+                    handle if handle.is_null() => win_err("CreateJobObjectA"),
                     handle => Ok(handle),
                 }?;
-                let mut job_info = winapi::um::winnt::JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
-                    BasicLimitInformation: winapi::um::winnt::JOBOBJECT_BASIC_LIMIT_INFORMATION {
-                        LimitFlags: winapi::um::winnt::JOB_OBJECT_LIMIT_PROCESS_MEMORY,
+                let job_info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
+                    BasicLimitInformation: JOBOBJECT_BASIC_LIMIT_INFORMATION {
+                        LimitFlags: JOB_OBJECT_LIMIT_PROCESS_MEMORY as u32,
                         ..Default::default()
                     },
                     ProcessMemoryLimit: ulimit as usize,
                     ..Default::default()
                 };
                 match unsafe {
-                    winapi::um::jobapi2::SetInformationJobObject(
+                    SetInformationJobObject(
                         job,
-                        winapi::um::winnt::JobObjectExtendedLimitInformation,
-                        &mut job_info
-                            as *mut winapi::um::winnt::JOBOBJECT_EXTENDED_LIMIT_INFORMATION
-                            as LPVOID,
-                        size_of::<winapi::um::winnt::JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+                        JobObjectExtendedLimitInformation,
+                        &job_info as *const JOBOBJECT_EXTENDED_LIMIT_INFORMATION as *const c_void,
+                        size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
                     )
                 } {
-                    FALSE => win_err("SetInformationJobObject"),
+                    0 => win_err("SetInformationJobObject"),
                     _ => Ok(()),
                 }?;
                 let child = cmd
@@ -83,45 +92,37 @@ fn read_test_process(ulimit: Option<u64>) -> Result<u64> {
                         effective_limits::Error::IoExplainedError(e, "error spawning helper".into())
                     })?;
                 let childhandle = match unsafe {
-                    winapi::um::processthreadsapi::OpenProcess(
-                        winapi::um::winnt::JOB_OBJECT_ASSIGN_PROCESS
-                    // The docs say only JOB_OBJECT_ASSIGN_PROCESS is
-                    // needed, but access denied is returned unless more
-                    // permissions are requested, and the actual set needed
-                    // is not documented.
-                        | winapi::um::winnt::PROCESS_ALL_ACCESS,
-                        FALSE,
+                    OpenProcess(
+                        (JOB_OBJECT_ASSIGN_PROCESS
+                        // The docs say only JOB_OBJECT_ASSIGN_PROCESS is
+                        // needed, but access denied is returned unless more
+                        // permissions are requested, and the actual set needed
+                        // is not documented.
+                            | PROCESS_ALL_ACCESS) as u32,
+                        0,
                         child.id(),
                     )
                 } {
-                    NULL => win_err("OpenProcess"),
+                    handle if handle.is_null() => win_err("OpenProcess"),
                     handle => Ok(handle),
                 }?;
                 println!("assigning job {} pid {}", job as u32, childhandle as u32);
-                let res =
-                    unsafe { winapi::um::jobapi2::AssignProcessToJobObject(job, childhandle) };
+                let res = unsafe { AssignProcessToJobObject(job, childhandle) };
                 match res {
-                    FALSE => win_err("AssignProcessToJobObject"),
+                    0 => win_err("AssignProcessToJobObject"),
                     _ => Ok(()),
                 }?;
-                let mut tid: DWORD = 0;
-                let tool = match unsafe {
-                    winapi::um::tlhelp32::CreateToolhelp32Snapshot(
-                        winapi::um::tlhelp32::TH32CS_SNAPTHREAD,
-                        0,
-                    )
-                } {
-                    winapi::um::handleapi::INVALID_HANDLE_VALUE => {
-                        win_err("CreateToolhelp32Snapshot")
-                    }
+                let mut tid: u32 = 0;
+                let tool = match unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD as u32, 0) } {
+                    handle if handle == INVALID_HANDLE_VALUE => win_err("CreateToolhelp32Snapshot"),
                     handle => Ok(handle),
                 }?;
-                let mut te = winapi::um::tlhelp32::THREADENTRY32 {
-                    dwSize: size_of::<winapi::um::tlhelp32::THREADENTRY32>() as u32,
+                let mut te = THREADENTRY32 {
+                    dwSize: size_of::<THREADENTRY32>() as u32,
                     ..Default::default()
                 };
-                match unsafe { winapi::um::tlhelp32::Thread32First(tool, &mut te) } {
-                    FALSE => win_err("Thread32First"),
+                match unsafe { Thread32First(tool, &mut te) } {
+                    0 => win_err("Thread32First"),
                     _ => Ok(()),
                 }?;
                 while {
@@ -130,35 +131,26 @@ fn read_test_process(ulimit: Option<u64>) -> Result<u64> {
                         tid = te.th32ThreadID;
                         // a break here would be nice.
                     };
-                    te.dwSize = size_of::<winapi::um::tlhelp32::THREADENTRY32>() as u32;
-                    match unsafe { winapi::um::tlhelp32::Thread32Next(tool, &mut te) } {
-                        FALSE => {
-                            let err = unsafe { winapi::um::errhandlingapi::GetLastError() };
-                            match err {
-                                winapi::shared::winerror::ERROR_NO_MORE_FILES => Ok(false),
-                                _ => win_err("Thread32Next"),
-                            }
-                        }
+                    te.dwSize = size_of::<THREADENTRY32>() as u32;
+                    match unsafe { Thread32Next(tool, &mut te) } {
+                        0 => match unsafe { GetLastError() } {
+                            err if err == ERROR_NO_MORE_FILES as u32 => Ok(false),
+                            _ => win_err("Thread32Next"),
+                        },
                         _ => Ok(true),
                     }?
                 } {}
-                match unsafe { winapi::um::handleapi::CloseHandle(tool) } {
-                    FALSE => win_err("CloseHandle"),
+                match unsafe { CloseHandle(tool) } {
+                    0 => win_err("CloseHandle"),
                     _ => Ok(()),
                 }?;
-                let thread = match unsafe {
-                    winapi::um::processthreadsapi::OpenThread(
-                        winapi::um::winnt::THREAD_SUSPEND_RESUME,
-                        FALSE,
-                        tid,
-                    )
-                } {
-                    NULL => win_err("OpenThread"),
+                let thread = match unsafe { OpenThread(THREAD_SUSPEND_RESUME as u32, 0, tid) } {
+                    handle if handle.is_null() => win_err("OpenThread"),
                     handle => Ok(handle),
                 }?;
 
-                match unsafe { winapi::um::processthreadsapi::ResumeThread(thread) } {
-                    std::u32::MAX => win_err("ResumeThread"),
+                match unsafe { ResumeThread(thread) } {
+                    u32::MAX => win_err("ResumeThread"),
                     _ => Ok(()),
                 }?;
                 child.wait_with_output().map_err(|e| {
