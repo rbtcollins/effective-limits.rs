@@ -8,7 +8,7 @@ license = "Apache-2.0"
 name = "effective-limits"
 readme = "README.md"
 repository = "https://github.com/rbtcollins/effective-limits.rs"
-version = "0.6.0"
+version = "0.7.0"
 
 [features]
 # Exposes testsupport for tests/; not for end users.
@@ -31,4 +31,3 @@ windows-link = "0.100"
 [dev-dependencies]
 similar-asserts = "2"
 windows-bindgen = "0.100"
-
