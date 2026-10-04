@@ -31,6 +31,7 @@ fn test_process_path() -> Option<PathBuf> {
     }
 }
 
+#[cfg(not(target_os = "openbsd"))]
 fn read_test_process(ulimit: Option<u64>) -> Result<u64> {
     // Spawn the test helper and read it's result.
     let path = test_process_path().unwrap();
@@ -226,6 +227,7 @@ fn test_no_ulimit() -> Result<()> {
     Ok(())
 }
 
+#[cfg(not(target_os = "openbsd"))]
 #[test]
 fn test_ulimit() -> Result<()> {
     // Page size rounding
