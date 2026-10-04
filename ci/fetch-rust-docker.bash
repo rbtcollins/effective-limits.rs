@@ -38,22 +38,21 @@ case "$TARGET" in
   *) exit ;;
 esac
 
-master=$(git ls-remote "$RUST_REPO" refs/heads/master | cut -f1)
-image_url="$ARTIFACTS_BASE_URL/$master/image-$image.txt"
+# Resolve the default branch's commit without hardcoding its name
+head=$(git ls-remote "$RUST_REPO" HEAD | cut -f1)
+if [ -z "$head" ]; then
+  echo "failed to resolve HEAD of $RUST_REPO" >&2
+  exit 1
+fi
+image_url="$ARTIFACTS_BASE_URL/$head/image-$image.txt"
 info="/tmp/image-$image.txt"
 
 rm -f "$info"
-curl -o "$info" "$image_url"
-digest=$(grep -m1 ^sha "$info")
+curl --fail -o "$info" "$image_url"
 
 if [ -z "$(docker images -q "${LOCAL_DOCKER_TAG}")" ]; then
-  url=$(grep -m1 ^https "$info")
-  cache=/tmp/rustci_docker_cache
-  echo "Attempting to download $url"
-  rm -f "$cache"
   set +e
-  command_retry curl -y 30 -Y 10 --connect-timeout 30 -f -L -C - -o "$cache" "$url"
+  docker pull $(cat "$info")
   set -e
-  docker load --quiet -i "$cache"
-  docker tag "$digest" "${LOCAL_DOCKER_TAG}"
+  docker tag $(cat "$info") "${LOCAL_DOCKER_TAG}"
 fi

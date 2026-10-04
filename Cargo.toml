@@ -10,12 +10,13 @@ readme = "README.md"
 repository = "https://github.com/rbtcollins/effective-limits.rs"
 version = "0.5.5"
 
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+# Exposes testsupport for tests/; not for end users.
+integration_tests = []
 
 [dependencies]
-cfg-if = "0.1.10"
-thiserror = "1.0.37"
+cfg-if = "1"
+thiserror = "2"
 
 [target.'cfg(any(windows, target_os="macos", target_os="linux", target_os="freebsd", target_os="illumos", target_os="solaris", target_os="netbsd", target_os="openbsd"))'.dependencies]
 sys-info = "0.9.1"

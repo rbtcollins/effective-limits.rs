@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    name: Build
+    name: Build (${{ matrix.target }})
     runs-on: windows-latest
     env:
       RUSTFLAGS: -Ctarget-feature=+crt-static
@@ -24,13 +24,13 @@ jobs:
           - i686-pc-windows-gnu # skip-pr skip-master
         include:
           - target: x86_64-pc-windows-gnu
-            mingw: https://ci-mirrors.rust-lang.org/rustc/x86_64-6.3.0-release-posix-seh-rt_v5-rev2.7z
+            mingw: https://ci-mirrors.rust-lang.org/rustc/x86_64-14.2.0-release-posix-seh-msvcrt-rt_v12-rev2.7z
             mingwdir: mingw64
           - target: i686-pc-windows-gnu
             mingwdir: mingw32
-            mingw: https://ci-mirrors.rust-lang.org/rustc/i686-6.3.0-release-posix-dwarf-rt_v5-rev2.7z
+            mingw: https://ci-mirrors.rust-lang.org/rustc/i686-14.2.0-release-posix-dwarf-msvcrt-rt_v12-rev2.7z
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         # v2 defaults to a shallow checkout, but we need at least to the previous tag
         with:
           fetch-depth: 0
@@ -64,7 +64,7 @@ jobs:
           echo "TARGET=${{ matrix.target }}" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
           echo "SKIP_TESTS=${{ matrix.skip_tests }}" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
       - name: Cache cargo registry and git trees
-        uses: actions/cache@v3
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -76,7 +76,7 @@ jobs:
           echo "::set-output name=rust_hash::$(rustc -Vv | grep commit-hash | awk '{print $2}')"
         shell: bash
       - name: Cache cargo build
-        uses: actions/cache@v3
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: target
           key: ${{ github.base_ref }}-${{ github.head_ref }}-${{ matrix.target }}-cargo-target-dir-${{ steps.cargo-target-cache.outputs.rust_hash }}-${{ hashFiles('**/Cargo.lock') }}
@@ -99,7 +99,7 @@ jobs:
         run: bash ci/run.bash
       - name: Upload the built artifact
         if: false
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: rustup-init-${{ matrix.target }}
           path: |
